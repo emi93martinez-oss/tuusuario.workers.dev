@@ -1,0 +1,540 @@
+<title>Corte de Fibra</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  /* Un solo mundo visual: plano nocturno de la ciudad, la fibra como hilos de luz con el código de colores real. */
+  :root {
+    --bg: #0a1120;
+    --panel: #0e182d;
+    --line: #1f2c4a;
+    --ink: #e7edfb;
+    --muted: #8b98b8;
+    --signal: #ffb547;   /* casco del técnico, acento */
+    --alert: #ff4f61;    /* corte */
+    --ok: #3fe3a6;       /* servicio restaurado */
+    --display: "Chakra Petch", "Rajdhani", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--mono);
+    overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none;
+  }
+  .app { height: 100%; display: flex; flex-direction: column; }
+  .hud {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 6px 14px; align-items: center;
+    padding-block: 10px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  .etq { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .num { font-family: var(--display); font-weight: 700; font-size: 22px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .sla { min-width: 0; }
+  .barra { height: 8px; border-radius: 4px; background: #1a2645; overflow: hidden; margin-top: 5px; }
+  .barra i { display: block; height: 100%; width: 100%; background: var(--ok); transition: width .2s linear, background .3s; }
+  .der { text-align: right; }
+  .otdr { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--muted); }
+  .otdr b { color: var(--signal); font-weight: 600; }
+  .zona { position: relative; flex: 1; min-height: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  .capa {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    background: rgba(8, 13, 26, .82); backdrop-filter: blur(3px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .tarjeta { max-width: 420px; width: 100%; display: grid; gap: 16px; }
+  h1 {
+    font-family: var(--display); font-weight: 700; font-size: clamp(38px, 11vw, 56px);
+    line-height: .95; margin: 0; letter-spacing: .01em; text-wrap: balance;
+  }
+  h1 span { color: var(--alert); }
+  .tarjeta p { margin: 0; line-height: 1.55; color: var(--ink); font-size: 14px; }
+  .pasos { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+  .pasos li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; }
+  .pasos li::before { content: attr(data-i); font-family: var(--display); color: var(--signal); font-weight: 700; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stats div { border-top: 1px solid var(--line); padding-top: 8px; }
+  button {
+    font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: .04em;
+    padding: 14px 20px; border: 0; border-radius: 6px; background: var(--signal); color: #1a1205; cursor: pointer;
+  }
+  button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .record { font-size: 12px; color: var(--muted); }
+  .colores { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
+  .colores i { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
+</style>
+
+<div class="app">
+  <header class="hud">
+    <div>
+      <div class="etq">Clientes restaurados</div>
+      <div class="num" id="score">0</div>
+    </div>
+    <div class="sla">
+      <div class="etq">SLA <span id="slaNum">100%</span></div>
+      <div class="barra"><i id="slaFill"></i></div>
+    </div>
+    <div class="der">
+      <div class="etq">Cortes</div>
+      <div class="num" id="cortes">0</div>
+    </div>
+    <div class="otdr"><span>OTDR: <b id="otdr">sin eventos</b></span><span id="reloj">00:00</span></div>
+  </header>
+
+  <div class="zona" id="zona">
+    <canvas id="mapa" aria-label="Mapa de la ciudad con la red de fibra"></canvas>
+
+    <div class="capa" id="inicio">
+      <div class="tarjeta">
+        <h1>CORTE DE <span>FIBRA</span></h1>
+        <p>Sos el técnico de guardia. Se cortan las troncales de la ciudad y miles de clientes se quedan sin internet. Llegá a cada corte, fusioná la fibra y devolvé el servicio antes de que se venza el SLA.</p>
+        <ul class="pasos">
+          <li data-i="1">Tocá el mapa para moverte (en compu también con flechas o WASD).</li>
+          <li data-i="2">Quedate sobre el corte hasta completar la fusión.</li>
+          <li data-i="3">Esquivá los autos: si te chocan, perdés la fusión.</li>
+        </ul>
+        <div class="colores" id="leyenda"></div>
+        <button id="jugar" type="button">Salir a reparar</button>
+        <div class="record" id="record"></div>
+      </div>
+    </div>
+
+    <div class="capa" id="fin" hidden>
+      <div class="tarjeta">
+        <h1>SLA <span>VENCIDO</span></h1>
+        <p id="finTexto">Demasiados clientes sin servicio. La guardia terminó.</p>
+        <div class="stats">
+          <div><div class="etq">Clientes restaurados</div><div class="num" id="fScore">0</div></div>
+          <div><div class="etq">Fusiones</div><div class="num" id="fFus">0</div></div>
+          <div><div class="etq">Pérdida promedio</div><div class="num" id="fDb">0 dB</div></div>
+          <div><div class="etq">Duración de guardia</div><div class="num" id="fTiempo">00:00</div></div>
+        </div>
+        <button id="otra" type="button">Otra guardia</button>
+        <div class="record" id="record2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const cv = $("mapa"), ctx = cv.getContext("2d"), zona = $("zona");
+
+  // Código de colores de fibra (TIA-598): las troncales del mapa usan los primeros seis.
+  const FIBRA = [
+    ["Azul", "#3b82f6"], ["Naranja", "#ff8a1f"], ["Verde", "#22c55e"],
+    ["Marrón", "#b0703c"], ["Gris", "#9aa8bf"], ["Blanco", "#f1f5f9"],
+  ];
+  const COLORES_AUTO = ["#e2e8f0", "#f87171", "#60a5fa", "#facc15", "#a3e635", "#c084fc"];
+
+  let W = 0, H = 0, DPR = 1, u = 4;
+  let mapa = null;
+  let S = null;
+  const teclas = new Set();
+  let apuntando = false;
+
+  // ---------- utilidades ----------
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const sem = (i, j, k) => { const s = Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453; return s - Math.floor(s); };
+  const fmt = (n) => Math.round(n).toLocaleString("es");
+  const hora = (t) => { const s = Math.floor(t); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
+  const leer = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+
+  // ---------- sonido (solo después de tocar "Salir a reparar") ----------
+  let audio = null;
+  function beep(freq, dur, tipo = "square", vol = 0.05) {
+    if (!audio) return;
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = tipo; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, audio.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
+    o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + dur);
+  }
+
+  // ---------- mapa ----------
+  const anchoCalle = () => Math.max(14, 3.4 * u);
+  const calleX = (i) => (i * W) / mapa.cols;
+  const calleY = (j) => (j * H) / mapa.filas;
+
+  function crearMapa() {
+    const cols = Math.max(3, Math.min(7, Math.round(W / 115)));
+    const filas = Math.max(3, Math.min(8, Math.round(H / 115)));
+    const verticales = [...Array(cols - 1).keys()].map((i) => i + 1).sort(() => Math.random() - 0.5);
+    const horizontales = [...Array(filas - 1).keys()].map((j) => j + 1).sort(() => Math.random() - 0.5);
+    const rutas = [];
+    const nv = Math.min(verticales.length, cols > 4 ? 3 : 2), nh = Math.min(horizontales.length, filas > 4 ? 3 : 2);
+    for (let k = 0; k < Math.max(nv, nh); k++) {
+      if (k < nv) rutas.push({ o: "v", i: verticales[k] });
+      if (k < nh) rutas.push({ o: "h", i: horizontales[k] });
+    }
+    rutas.forEach((r, k) => { r.nombre = FIBRA[k % FIBRA.length][0]; r.color = FIBRA[k % FIBRA.length][1]; });
+    mapa = { cols, filas, rutas };
+  }
+
+  function posRuta(r, f) {
+    const off = anchoCalle() * 0.3;
+    return r.o === "v" ? { x: calleX(r.i) + off, y: f * H } : { x: f * W, y: calleY(r.i) + off };
+  }
+
+  function ajustar() {
+    const rect = zona.getBoundingClientRect();
+    const nW = Math.max(1, rect.width), nH = Math.max(1, rect.height);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(nW * DPR); cv.height = Math.round(nH * DPR);
+    if (S && W && H) {
+      const sx = nW / W, sy = nH / H;
+      for (const p of [S.tec, ...S.textos, ...S.chispas]) { p.x *= sx; p.y *= sy; }
+      S.tec.tx *= sx; S.tec.ty *= sy;
+    }
+    W = nW; H = nH; u = Math.min(W, H) / 100;
+    if (!mapa) crearMapa();
+  }
+
+  // ---------- estado del juego ----------
+  function nuevoEstado() {
+    const i = Math.floor(mapa.cols / 2), j = Math.floor(mapa.filas / 2);
+    return {
+      fase: "inicio", t: 0, score: 0, sla: 100, fusiones: 0, perdida: 0, prox: 0.6,
+      tec: { x: calleX(i), y: calleY(j), tx: calleX(i), ty: calleY(j), golpe: 0, fus: 0, ang: 0 },
+      cortes: [], autos: [], textos: [], chispas: [],
+    };
+  }
+
+  function nuevoAuto(d) {
+    const vertical = Math.random() < 0.5;
+    const n = vertical ? mapa.cols - 1 : mapa.filas - 1;
+    const i = 1 + Math.floor(Math.random() * n);
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const largo = vertical ? H : W;
+    return {
+      vertical, i, dir, s: Math.random() * largo,
+      v: (16 + Math.random() * 14 + d * 14), color: COLORES_AUTO[Math.floor(Math.random() * COLORES_AUTO.length)],
+    };
+  }
+
+  function rectAuto(a) {
+    const sw = anchoCalle(), L = Math.max(16, 4.4 * u), A = Math.max(9, 2.4 * u);
+    const carril = -a.dir * sw * 0.22;
+    if (a.vertical) { const cx = calleX(a.i) + carril; return { x: cx - A / 2, y: a.s - L / 2, w: A, h: L }; }
+    const cy = calleY(a.i) - carril; return { x: a.s - L / 2, y: cy - A / 2, w: L, h: A };
+  }
+
+  function nuevoCorte(d) {
+    for (let intento = 0; intento < 14; intento++) {
+      const r = mapa.rutas[Math.floor(Math.random() * mapa.rutas.length)];
+      const f = rnd(0.08, 0.92);
+      const p = posRuta(r, f);
+      const lejosTec = Math.hypot(p.x - S.tec.x, p.y - S.tec.y) > 18 * u;
+      const lejosOtros = S.cortes.every((c) => { const q = posRuta(c.ruta, c.f); return Math.hypot(p.x - q.x, p.y - q.y) > 14 * u; });
+      if (lejosTec && lejosOtros) {
+        const total = lerp(22, 12, d);
+        S.cortes.push({ ruta: r, f, clientes: Math.round(40 + Math.random() * (160 + d * 340)), tiempo: total, total, nace: S.t });
+        beep(220, 0.18, "sawtooth", 0.04);
+        return;
+      }
+    }
+  }
+
+  function texto(x, y, msg, color) { S.textos.push({ x, y, msg, color, vida: 1.4 }); }
+  function chispas(x, y, color, n = 16) {
+    for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, v = rnd(20, 70) * u / 4; S.chispas.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vida: rnd(0.3, 0.7), color }); }
+  }
+
+  // ---------- lógica ----------
+  function actualizar(dt) {
+    const jugando = S.fase === "juego";
+    const d = Math.min(1, S.t / 150);
+
+    // tráfico
+    const autosMeta = Math.round((3 + d * 7) * (mapa.cols + mapa.filas) / 9);
+    while (S.autos.length < autosMeta) S.autos.push(nuevoAuto(d));
+    for (const a of S.autos) {
+      const largo = a.vertical ? H : W, L = Math.max(16, 4.4 * u);
+      a.s += a.dir * a.v * u * dt;
+      if (a.s > largo + L) a.s = -L; else if (a.s < -L) a.s = largo + L;
+    }
+
+    for (const t of S.textos) { t.vida -= dt; t.y -= 14 * dt; }
+    S.textos = S.textos.filter((t) => t.vida > 0);
+    for (const c of S.chispas) { c.vida -= dt; c.x += c.vx * dt; c.y += c.vy * dt; c.vx *= 0.92; c.vy *= 0.92; }
+    S.chispas = S.chispas.filter((c) => c.vida > 0);
+
+    if (!jugando) return;
+    S.t += dt;
+
+    // aparición de cortes
+    S.prox -= dt;
+    if (S.prox <= 0 && S.cortes.length < 3 + Math.floor(d * 4)) { nuevoCorte(d); S.prox = lerp(6.5, 2.2, d) * rnd(0.7, 1.3); }
+
+    // movimiento del técnico
+    const T = S.tec, vel = 30 * u;
+    if (T.golpe > 0) T.golpe -= dt;
+    else {
+      let kx = 0, ky = 0;
+      if (teclas.has("ArrowLeft") || teclas.has("a")) kx -= 1;
+      if (teclas.has("ArrowRight") || teclas.has("d")) kx += 1;
+      if (teclas.has("ArrowUp") || teclas.has("w")) ky -= 1;
+      if (teclas.has("ArrowDown") || teclas.has("s")) ky += 1;
+      if (kx || ky) { const m = Math.hypot(kx, ky); T.x += (kx / m) * vel * dt; T.y += (ky / m) * vel * dt; T.tx = T.x; T.ty = T.y; T.ang = Math.atan2(ky, kx); }
+      else {
+        const dx = T.tx - T.x, dy = T.ty - T.y, dist = Math.hypot(dx, dy);
+        if (dist > 1) { const paso = Math.min(dist, vel * dt); T.x += (dx / dist) * paso; T.y += (dy / dist) * paso; T.ang = Math.atan2(dy, dx); }
+      }
+    }
+    const r = Math.max(9, 2.4 * u);
+    T.x = Math.max(r, Math.min(W - r, T.x)); T.y = Math.max(r, Math.min(H - r, T.y));
+
+    // choques
+    if (T.golpe <= 0) {
+      for (const a of S.autos) {
+        const R = rectAuto(a);
+        const cx = Math.max(R.x, Math.min(T.x, R.x + R.w)), cy = Math.max(R.y, Math.min(T.y, R.y + R.h));
+        if (Math.hypot(T.x - cx, T.y - cy) < r) {
+          T.golpe = 1.1; T.fus = 0; S.sla -= 3;
+          const empuje = 6 * u;
+          if (a.vertical) T.x += T.x < R.x + R.w / 2 ? -empuje : empuje; else T.y += T.y < R.y + R.h / 2 ? -empuje : empuje;
+          T.tx = T.x; T.ty = T.y;
+          texto(T.x, T.y - 4 * u, "¡Cuidado! −3% SLA", "#ff4f61");
+          beep(90, 0.3, "sawtooth", 0.06);
+          break;
+        }
+      }
+    }
+
+    // fusión
+    let cerca = null;
+    for (const c of S.cortes) { const p = posRuta(c.ruta, c.f); if (Math.hypot(p.x - T.x, p.y - T.y) < 5.5 * u) { cerca = c; break; } }
+    if (cerca && T.golpe <= 0) {
+      const antes = T.fus;
+      T.fus += dt / 1.5;
+      if (Math.floor(antes * 6) !== Math.floor(T.fus * 6)) beep(880 + T.fus * 400, 0.04, "square", 0.025);
+      if (T.fus >= 1) {
+        const p = posRuta(cerca.ruta, cerca.f);
+        const db = 0.02 + Math.random() * 0.06;
+        S.score += cerca.clientes; S.fusiones++; S.perdida += db; S.sla = Math.min(100, S.sla + 5);
+        S.cortes = S.cortes.filter((c) => c !== cerca); T.fus = 0;
+        texto(p.x, p.y - 5 * u, "+" + fmt(cerca.clientes) + " clientes · " + db.toFixed(2).replace(".", ",") + " dB", "#3fe3a6");
+        chispas(p.x, p.y, cerca.ruta.color, 22);
+        beep(660, 0.08, "triangle", 0.06); setTimeout(() => beep(990, 0.14, "triangle", 0.06), 80);
+      }
+    } else T.fus = Math.max(0, T.fus - dt * 2);
+
+    // vencimiento de cortes y caída del SLA
+    let sinServicio = 0;
+    for (const c of S.cortes) {
+      c.tiempo -= dt; sinServicio += c.clientes;
+      if (c.tiempo <= 0) {
+        const p = posRuta(c.ruta, c.f);
+        S.sla -= 14; texto(p.x, p.y - 5 * u, "Reclamo: −14% SLA", "#ff4f61"); chispas(p.x, p.y, "#ff4f61", 12);
+        beep(140, 0.4, "sawtooth", 0.06);
+      }
+    }
+    S.cortes = S.cortes.filter((c) => c.tiempo > 0);
+    S.sla -= (sinServicio / 1400) * dt;
+
+    if (S.sla <= 0) terminar();
+  }
+
+  // ---------- dibujo ----------
+  function dibujar(ahora) {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const sw = anchoCalle();
+    ctx.fillStyle = "#0d1628"; ctx.fillRect(0, 0, W, H);
+
+    // manzanas y edificios
+    for (let i = 0; i < mapa.cols; i++) for (let j = 0; j < mapa.filas; j++) {
+      const x0 = calleX(i) + (i ? sw / 2 : 0) + 3, x1 = calleX(i + 1) - (i < mapa.cols - 1 ? sw / 2 : 0) - 3;
+      const y0 = calleY(j) + (j ? sw / 2 : 0) + 3, y1 = calleY(j + 1) - (j < mapa.filas - 1 ? sw / 2 : 0) - 3;
+      ctx.fillStyle = "#111d34"; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      const n = 2 + Math.floor(sem(i, j, 0) * 3);
+      for (let k = 0; k < n; k++) {
+        const bx = x0 + 4 + sem(i, j, k + 1) * (x1 - x0) * 0.55, by = y0 + 4 + sem(i, j, k + 9) * (y1 - y0) * 0.55;
+        const bw = (x1 - x0) * (0.2 + sem(i, j, k + 3) * 0.22), bh = (y1 - y0) * (0.2 + sem(i, j, k + 5) * 0.22);
+        ctx.fillStyle = sem(i, j, k + 7) > 0.5 ? "#172540" : "#14213b";
+        ctx.fillRect(bx, by, Math.min(bw, x1 - bx - 4), Math.min(bh, y1 - by - 4));
+      }
+    }
+    // nodo central (esquina superior izquierda)
+    ctx.fillStyle = "#1d2b4d"; ctx.fillRect(8, 8, 9 * u + 20, 5 * u + 10);
+    ctx.fillStyle = "#8b98b8"; ctx.font = `600 ${Math.max(9, 2.2 * u)}px "IBM Plex Mono", monospace`;
+    ctx.fillText("NODO", 14, 8 + (5 * u + 10) / 2 + 4);
+
+    // calles
+    ctx.fillStyle = "#18243f";
+    for (let i = 1; i < mapa.cols; i++) ctx.fillRect(calleX(i) - sw / 2, 0, sw, H);
+    for (let j = 1; j < mapa.filas; j++) ctx.fillRect(0, calleY(j) - sw / 2, W, sw);
+    ctx.strokeStyle = "rgba(139,152,184,.18)"; ctx.lineWidth = 1; ctx.setLineDash([6, 8]);
+    ctx.beginPath();
+    for (let i = 1; i < mapa.cols; i++) { ctx.moveTo(calleX(i), 0); ctx.lineTo(calleX(i), H); }
+    for (let j = 1; j < mapa.filas; j++) { ctx.moveTo(0, calleY(j)); ctx.lineTo(W, calleY(j)); }
+    ctx.stroke(); ctx.setLineDash([]);
+
+    // troncales de fibra: línea base + pulsos de luz
+    const t = ahora / 1000;
+    for (const r of mapa.rutas) {
+      const a = posRuta(r, 0), b = posRuta(r, 1);
+      ctx.strokeStyle = r.color; ctx.globalAlpha = 0.35; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.globalAlpha = 0.95; ctx.lineWidth = 2.5; ctx.setLineDash([3, 16]); ctx.lineDashOffset = -t * 70;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+
+    // cortes
+    for (const c of S.cortes) {
+      const p = posRuta(c.ruta, c.f), frac = c.tiempo / c.total;
+      const pulso = 1 + Math.sin(t * 8) * 0.12, R = 4.2 * u * pulso;
+      ctx.fillStyle = "#0d1628"; ctx.beginPath(); ctx.arc(p.x, p.y, 2.2 * u, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(255,79,97,.35)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = frac < 0.3 ? "#ff4f61" : "#ffb547"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(p.x, p.y, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); ctx.stroke();
+      // cruz del corte
+      ctx.strokeStyle = "#ff4f61"; ctx.lineWidth = 2.5; const k = 1.3 * u;
+      ctx.beginPath(); ctx.moveTo(p.x - k, p.y - k); ctx.lineTo(p.x + k, p.y + k); ctx.moveTo(p.x + k, p.y - k); ctx.lineTo(p.x - k, p.y + k); ctx.stroke();
+      ctx.fillStyle = "#e7edfb"; ctx.font = `600 ${Math.max(10, 2.4 * u)}px "IBM Plex Mono", monospace`; ctx.textAlign = "center";
+      ctx.fillText(fmt(c.clientes), p.x, p.y - R - 4);
+      ctx.textAlign = "left";
+      if (Math.random() < 0.15) chispas(p.x, p.y, c.ruta.color, 1);
+    }
+
+    // autos
+    for (const a of S.autos) {
+      const R = rectAuto(a);
+      ctx.fillStyle = a.color; ctx.fillRect(R.x, R.y, R.w, R.h);
+      ctx.fillStyle = "rgba(10,17,32,.55)";
+      if (a.vertical) ctx.fillRect(R.x + 1.5, R.y + R.h * (a.dir > 0 ? 0.5 : 0.2), R.w - 3, R.h * 0.3);
+      else ctx.fillRect(R.x + R.w * (a.dir > 0 ? 0.5 : 0.2), R.y + 1.5, R.w * 0.3, R.h - 3);
+      ctx.fillStyle = "rgba(255,240,180,.9)";
+      if (a.vertical) { const y = a.dir > 0 ? R.y + R.h - 2 : R.y; ctx.fillRect(R.x + 1, y, 2.5, 2); ctx.fillRect(R.x + R.w - 3.5, y, 2.5, 2); }
+      else { const x = a.dir > 0 ? R.x + R.w - 2 : R.x; ctx.fillRect(x, R.y + 1, 2, 2.5); ctx.fillRect(x, R.y + R.h - 3.5, 2, 2.5); }
+    }
+
+    // destino
+    const T = S.tec;
+    if (S.fase === "juego" && Math.hypot(T.tx - T.x, T.ty - T.y) > 3) {
+      ctx.strokeStyle = "rgba(255,181,71,.6)"; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(T.x, T.y); ctx.lineTo(T.tx, T.ty); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(T.tx, T.ty, 1.6 * u, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // técnico
+    const r = Math.max(9, 2.4 * u);
+    if (!(T.golpe > 0 && Math.floor(t * 14) % 2)) {
+      ctx.fillStyle = "#0a1120"; ctx.beginPath(); ctx.arc(T.x, T.y, r + 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffb547"; ctx.beginPath(); ctx.arc(T.x, T.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#1a1205"; ctx.beginPath();
+      ctx.arc(T.x + Math.cos(T.ang) * r * 0.45, T.y + Math.sin(T.ang) * r * 0.45, r * 0.32, 0, Math.PI * 2); ctx.fill();
+    }
+    if (T.fus > 0) {
+      ctx.strokeStyle = "#3fe3a6"; ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.arc(T.x, T.y, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * T.fus); ctx.stroke();
+      ctx.fillStyle = "#3fe3a6"; ctx.font = `600 ${Math.max(10, 2.3 * u)}px "IBM Plex Mono", monospace`; ctx.textAlign = "center";
+      ctx.fillText("Fusionando " + Math.floor(T.fus * 100) + "%", T.x, T.y + r + 6 + Math.max(12, 3 * u));
+      ctx.textAlign = "left";
+    }
+
+    // chispas y textos
+    for (const c of S.chispas) { ctx.globalAlpha = Math.min(1, c.vida * 2); ctx.fillStyle = c.color; ctx.fillRect(c.x - 1.2, c.y - 1.2, 2.4, 2.4); }
+    ctx.globalAlpha = 1; ctx.textAlign = "center";
+    for (const m of S.textos) {
+      ctx.globalAlpha = Math.min(1, m.vida); ctx.fillStyle = m.color;
+      ctx.font = `700 ${Math.max(12, 2.8 * u)}px "Chakra Petch", sans-serif`;
+      ctx.fillText(m.msg, Math.max(70, Math.min(W - 70, m.x)), Math.max(16, m.y));
+    }
+    ctx.globalAlpha = 1; ctx.textAlign = "left";
+  }
+
+  // ---------- HUD ----------
+  const el = { score: $("score"), slaNum: $("slaNum"), slaFill: $("slaFill"), cortes: $("cortes"), otdr: $("otdr"), reloj: $("reloj") };
+  function hud() {
+    el.score.textContent = fmt(S.score);
+    const sla = Math.max(0, S.sla);
+    el.slaNum.textContent = Math.ceil(sla) + "%";
+    el.slaFill.style.width = sla + "%";
+    el.slaFill.style.background = sla > 55 ? "#3fe3a6" : sla > 25 ? "#ffb547" : "#ff4f61";
+    el.cortes.textContent = S.cortes.length;
+    el.reloj.textContent = hora(S.t);
+    if (!S.cortes.length) { el.otdr.textContent = "sin eventos"; return; }
+    let mejor = null, dm = Infinity;
+    for (const c of S.cortes) { const p = posRuta(c.ruta, c.f), dd = Math.hypot(p.x - S.tec.x, p.y - S.tec.y); if (dd < dm) { dm = dd; mejor = c; } }
+    el.otdr.textContent = "evento a " + fmt((dm / u) * 12) + " m · fibra " + mejor.ruta.nombre.toLowerCase();
+  }
+
+  // ---------- fases ----------
+  function record() {
+    const r = Number(leer("corte-fibra-record")) || 0;
+    const txt = r ? "Tu récord: " + fmt(r) + " clientes restaurados" : "";
+    $("record").textContent = txt; $("record2").textContent = txt;
+  }
+
+  function empezar() {
+    if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
+    if (audio && audio.state === "suspended") audio.resume();
+    crearMapa();
+    const autos = S ? S.autos : [];
+    S = nuevoEstado(); S.autos = autos.filter((a) => a.i < (a.vertical ? mapa.cols : mapa.filas));
+    S.fase = "juego";
+    $("inicio").hidden = true; $("fin").hidden = true;
+  }
+
+  function terminar() {
+    S.fase = "fin"; S.sla = 0;
+    $("fScore").textContent = fmt(S.score);
+    $("fFus").textContent = S.fusiones;
+    $("fDb").textContent = (S.fusiones ? S.perdida / S.fusiones : 0).toFixed(3).replace(".", ",") + " dB";
+    $("fTiempo").textContent = hora(S.t);
+    const previo = Number(leer("corte-fibra-record")) || 0;
+    $("finTexto").textContent = S.score > previo && S.score > 0
+      ? "¡Nuevo récord! Devolviste el servicio a " + fmt(S.score) + " clientes."
+      : "Demasiados clientes sin servicio. La guardia terminó.";
+    if (S.score > previo) guardar("corte-fibra-record", String(S.score));
+    record();
+    $("fin").hidden = false;
+    $("otra").focus();
+  }
+
+  // ---------- entrada ----------
+  function apuntar(e) {
+    if (!S || S.fase !== "juego") return;
+    const rect = cv.getBoundingClientRect();
+    let x = e.clientX - rect.left, y = e.clientY - rect.top;
+    for (const c of S.cortes) { const p = posRuta(c.ruta, c.f); if (Math.hypot(p.x - x, p.y - y) < 9 * u) { x = p.x; y = p.y; break; } }
+    S.tec.tx = x; S.tec.ty = y;
+  }
+  cv.addEventListener("pointerdown", (e) => { apuntando = true; apuntar(e); });
+  cv.addEventListener("pointermove", (e) => { if (apuntando) apuntar(e); });
+  window.addEventListener("pointerup", () => { apuntando = false; });
+  window.addEventListener("keydown", (e) => {
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "w", "a", "s", "d"].includes(k)) { teclas.add(k); if (S && S.fase === "juego") e.preventDefault(); }
+  });
+  window.addEventListener("keyup", (e) => teclas.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key));
+  $("jugar").addEventListener("click", empezar);
+  $("otra").addEventListener("click", empezar);
+
+  // leyenda con el código de colores
+  $("leyenda").innerHTML = "<span>Código de colores:</span>" + FIBRA.map(([n, c]) => `<span><i style="background:${c}"></i> ${n}</span>`).join("");
+
+  // ---------- arranque ----------
+  ajustar();
+  S = nuevoEstado();
+  new ResizeObserver(ajustar).observe(zona);
+  record();
+  let previo = performance.now();
+  function bucle(ahora) {
+    const dt = Math.min(0.05, (ahora - previo) / 1000); previo = ahora;
+    actualizar(dt); dibujar(ahora); hud();
+    requestAnimationFrame(bucle);
+  }
+  requestAnimationFrame(bucle);
+})();
+</script>
