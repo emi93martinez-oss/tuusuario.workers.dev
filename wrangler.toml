@@ -1,0 +1,10 @@
+name = "api-herramientas"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+# Base de datos KV donde se guardan las claves de clientes y el uso diario.
+# Para crearla: npx wrangler kv namespace create CLAVES
+# y pegá acá el "id" que te devuelve.
+[[kv_namespaces]]
+binding = "CLAVES"
+id = "PEGAR_ACA_EL_ID_DE_TU_KV"
